@@ -53,15 +53,15 @@ When actual load runs above forecast, smart traders immediately update their exp
 ###  
 Load forecasting forms the foundation of successful power trading. The analysis presented here demonstrates several critical principles:
 
-**1. Pattern Recognition Drives Profit**: Understanding how load varies by hour, day type, and season allows traders to position themselves ahead of predictable movements.
+1. Pattern Recognition Drives Profit: Understanding how load varies by hour, day type, and season allows traders to position themselves ahead of predictable movements.
 
-**2. Weather Is the Dominant Variable**: Temperature and humidity drive 40--60% of load variability. Accurate weather forecasts translate directly to profitable trading positions.
+2. Weather Is the Dominant Variable: Temperature and humidity drive 40--60% of load variability. Accurate weather forecasts translate directly to profitable trading positions.
 
-**3. Price Response Is Non-Linear**: Prices don't move linearly with load. During tight supply conditions, small load increases cause exponential price spikes.
+3. Price Response Is Non-Linear: Prices don't move linearly with load. During tight supply conditions, small load increases cause exponential price spikes.
 
-**4. Real-Time Adaptation Matters**: Markets move continuously. Static forecasts become stale quickly. Successful traders update their views as new information arrives.
+4. Real-Time Adaptation Matters: Markets move continuously. Static forecasts become stale quickly. Successful traders update their views as new information arrives.
 
-**5. Accuracy Equals Money**: A 1% improvement in forecast accuracy can translate to millions of dollars in improved trading performance for large portfolios.
+5. Accuracy Equals Money: A 1% improvement in forecast accuracy can translate to millions of dollars in improved trading performance for large portfolios.
 
 The code examples provided offer implementations you can deploy immediately. Start with the base load curve generation, add weather adjustments, incorporate machine learning, and implement real-time updates. Each enhancement increases your competitive edge.
 
@@ -69,11 +69,11 @@ The code examples provided offer implementations you can deploy immediately. Sta
 ###  
 To implement these forecasting techniques in your own trading operation:
 
-1.  [**Establish Baseline**: Start with simple pattern-based forecasts using historical load data]
-2.  [**Add Weather Integration**: Incorporate temperature and humidity forecasts from reliable meteorological services]
-3.  [**Deploy Machine Learning**: Train gradient boosting models on your historical data]
-4.  [**Enable Real-Time Updates**: Build infrastructure to continuously update forecasts as actual data arrives]
-5.  [**Validate and Refine**: Compare forecast accuracy against actual outcomes and continuously improve your models]
+1.  [Establish Baseline: Start with simple pattern-based forecasts using historical load data]
+2.  [Add Weather Integration: Incorporate temperature and humidity forecasts from reliable meteorological services]
+3.  [Deploy Machine Learning: Train gradient boosting models on your historical data]
+4.  [Enable Real-Time Updates: Build infrastructure to continuously update forecasts as actual data arrives]
+5.  [Validate and Refine: Compare forecast accuracy against actual outcomes and continuously improve your models]
 
 The traders who master load forecasting gain a decisive advantage in power markets. While others react to price movements, you'll anticipate them-positioning your portfolio to profit from predictable patterns that repeat day after day, season after season. *Originally published at* [*https://kylejones200.github.io*](https://kylejones200.github.io/medium/01_load_forecasting_blog.html)*.* [View original.](https://medium.com/p/887ac9422b7b)
 

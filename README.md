@@ -1,7 +1,7 @@
 # 01 load forecasting blog
 
-**Published:** draft
-**Medium:** [https://medium.com/@kyle-t-jones/01-load-forecasting-blog-887ac9422b7b](https://medium.com/@kyle-t-jones/01-load-forecasting-blog-887ac9422b7b)
+Published: draft
+Medium: [https://medium.com/@kyle-t-jones/01-load-forecasting-blog-887ac9422b7b](https://medium.com/@kyle-t-jones/01-load-forecasting-blog-887ac9422b7b)
 
 ## About
 
