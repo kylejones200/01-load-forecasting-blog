@@ -1,3 +1,8 @@
+---
+canonical_link: "https://medium.com/p/887ac9422b7b"
+date_exported_from_medium: "November 10, 2025"
+---
+
 # 01_load_forecasting_blog Power markets operate on razor-thin margins where a single
 miscalculation can cost millions. When Texas faced its historic winter storm in...
 
@@ -75,6 +80,4 @@ To implement these forecasting techniques in your own trading operation:
 4.  [Enable Real-Time Updates: Build infrastructure to continuously update forecasts as actual data arrives]
 5.  [Validate and Refine: Compare forecast accuracy against actual outcomes and continuously improve your models]
 
-The traders who master load forecasting gain a decisive advantage in power markets. While others react to price movements, you'll anticipate them-positioning your portfolio to profit from predictable patterns that repeat day after day, season after season. *Originally published at* [*https://kylejones200.github.io*](https://kylejones200.github.io/medium/01_load_forecasting_blog.html)*.* [View original.](https://medium.com/p/887ac9422b7b)
-
-Exported from [Medium](https://medium.com) on November 10, 2025.
+The traders who master load forecasting gain a decisive advantage in power markets. While others react to price movements, you'll anticipate them-positioning your portfolio to profit from predictable patterns that repeat day after day, season after season. *Originally published at* [*https://kylejones200.github.io*](https://kylejones200.github.io/medium/01_load_forecasting_blog.html)*.*
