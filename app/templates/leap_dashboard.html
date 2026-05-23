@@ -1,0 +1,2020 @@
+{% extends "base.html" %}
+
+{% block title %}LEAP - Load Estimation and Planning{% endblock %}
+
+{% block head %}
+<style>
+ .leap-container {
+ display: flex;
+ height: calc(100vh - 120px);
+ margin: 0;
+ padding: 0;
+ }
+ 
+ .map-pane {
+ flex: 1;
+ min-width: 300px;
+ background: #f8f9fa;
+ border-right: 3px solid #ddd;
+ position: relative;
+ overflow: hidden;
+ }
+ 
+ .charts-pane {
+ flex: 1;
+ min-width: 300px;
+ padding: 20px;
+ overflow-y: auto;
+ }
+ 
+ .resize-handle {
+ width: 6px;
+ background: #ddd;
+ cursor: col-resize;
+ position: relative;
+ flex-shrink: 0;
+ }
+ 
+ .resize-handle:hover {
+ background: #007bff;
+ }
+ 
+ .control-panel {
+ background: white;
+ padding: 20px;
+ border-radius: 8px;
+ box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+ margin-bottom: 20px;
+ }
+ 
+ .control-row {
+ display: flex;
+ gap: 15px;
+ align-items: center;
+ margin-bottom: 10px;
+ }
+ 
+ .control-row:last-child {
+ margin-bottom: 0;
+ }
+ 
+ .control-group {
+ display: flex;
+ flex-direction: column;
+ gap: 5px;
+ }
+ 
+ .control-group label {
+ font-size: 12px;
+ font-weight: 600;
+ color: #666;
+ margin: 0;
+ }
+ 
+ .control-group select,
+ .control-group input {
+ padding: 6px 10px;
+ border: 1px solid #ddd;
+ border-radius: 4px;
+ font-size: 14px;
+ }
+ 
+ .btn-group {
+ display: flex;
+ gap: 8px;
+ }
+ 
+ .btn-sm {
+ padding: 6px 12px;
+ font-size: 12px;
+ border-radius: 4px;
+ }
+ 
+ .map-container {
+ height: 100%;
+ width: 100%;
+ }
+ 
+ #leap-map {
+ height: 100%;
+ width: 100%;
+ background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+ display: flex;
+ align-items: center;
+ justify-content: center;
+ color: white;
+ font-size: 18px;
+ text-align: center;
+ }
+ 
+ .chart-section {
+ margin-bottom: 30px;
+ background: white;
+ border-radius: 8px;
+ box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+ overflow: hidden;
+ }
+ 
+ .chart-header {
+ background: #f8f9fa;
+ padding: 15px 20px;
+ border-bottom: 1px solid #eee;
+ }
+ 
+ .chart-header h3 {
+ margin: 0;
+ font-size: 18px;
+ color: #333;
+ }
+ 
+ .chart-content {
+ padding: 20px;
+ }
+ 
+ .metrics-grid {
+ display: grid;
+ grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+ gap: 15px;
+ margin-bottom: 20px;
+ }
+ 
+ .metric-card {
+ background: #f8f9fa;
+ padding: 15px;
+ border-radius: 6px;
+ text-align: center;
+ }
+ 
+ .metric-value {
+ font-size: 24px;
+ font-weight: bold;
+ color: #007bff;
+ margin-bottom: 5px;
+ }
+ 
+ .metric-label {
+ font-size: 12px;
+ color: #666;
+ text-transform: uppercase;
+ letter-spacing: 0.5px;
+ }
+ 
+ .loading {
+ text-align: center;
+ padding: 40px;
+ color: #666;
+ }
+ 
+ .error {
+ background: #f8d7da;
+ color: #721c24;
+ padding: 15px;
+ border-radius: 4px;
+ margin: 10px 0;
+ }
+ 
+ .status-indicator {
+ display: inline-block;
+ width: 8px;
+ height: 8px;
+ border-radius: 50%;
+ margin-right: 8px;
+ }
+ 
+ .status-online { background: #28a745; }
+ .status-offline { background: #dc3545; }
+ .status-loading { background: #ffc107; }
+ 
+ /* Custom cluster styles */
+ .power-plant-cluster {
+ background: rgba(255, 120, 0, 0.8);
+ border: 2px solid #ff7800;
+ }
+ 
+ .transmission-cluster {
+ background: rgba(0, 120, 255, 0.8);
+ border: 2px solid #0078ff;
+ }
+ 
+ .power-plant-cluster div,
+ .transmission-cluster div {
+ background: inherit;
+ border-radius: 50%;
+ text-align: center;
+ font-weight: bold;
+ color: white;
+ text-shadow: 1px 1px 1px rgba(0,0,0,0.5);
+ }
+ 
+ /* Map popup styles */
+ .map-popup {
+ font-family: inherit;
+ min-width: 200px;
+ }
+ 
+ .map-popup h6 {
+ margin: 0 0 10px 0;
+ color: #333;
+ border-bottom: 1px solid #eee;
+ padding-bottom: 5px;
+ }
+ 
+ .map-popup div {
+ margin-bottom: 3px;
+ font-size: 13px;
+ }
+ 
+ /* Form check styling */
+ .form-check-label {
+ font-size: 13px;
+ cursor: pointer;
+ display: flex;
+ align-items: center;
+ gap: 5px;
+ }
+ 
+ .form-check-input {
+ margin: 0 !important;
+ }
+</style>
+
+<!-- Leaflet for maps -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<!-- Leaflet MarkerCluster plugin -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+
+<!-- Chart.js for charts -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/date-fns@2.29.3/index.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@2.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid p-0">
+ <div class="leap-container">
+ <!-- Map Pane -->
+ <div class="map-pane">
+ <div class="map-container">
+ <div id="leap-map">
+ <div>
+ <h4>LEAP Service Territory Map</h4>
+ <p>Interactive map showing balancing authority boundaries<br>
+ and load forecast heat overlays</p>
+ <small>Use controls on the right to select areas and scenarios</small>
+ </div>
+ </div>
+ </div>
+ </div>
+ 
+ <!-- Resize Handle -->
+ <div class="resize-handle" id="resize-handle"></div>
+ 
+ <!-- Charts Pane -->
+ <div class="charts-pane">
+ <!-- Control Panel moved here -->
+ <div class="control-panel">
+ <div class="control-row">
+ <div class="control-group">
+ <label>Balancing Authority</label>
+ <select id="ba-select">
+ <option value="">Select Area...</option>
+ {% for area in areas %}
+ <option value="{{ area.ba }}">{{ area.name }} ({{ area.ba }})</option>
+ {% endfor %}
+ </select>
+ </div>
+ <div class="control-group">
+ <label>Forecast Horizon</label>
+ <select id="horizon-select">
+ <option value="24">24 Hours</option>
+ <option value="48">48 Hours</option>
+ <option value="168">1 Week</option>
+ </select>
+ </div>
+ <div class="control-group">
+ <label>Scenario</label>
+ <select id="scenario-select">
+ <option value="baseline">Baseline</option>
+ <option value="high_growth">High Growth</option>
+ <option value="hot_weather">Hot Weather</option>
+ <option value="demand_response">Demand Response</option>
+ </select>
+ </div>
+ </div>
+ <div class="control-row">
+ <div class="btn-group">
+ <button class="btn btn-primary btn-sm" onclick="updateForecast()">
+ <span class="status-indicator status-loading" id="status-indicator"></span>
+ Update Forecast
+ </button>
+ <button class="btn btn-secondary btn-sm" onclick="exportData()">Export</button>
+ <button class="btn btn-outline-secondary btn-sm" onclick="toggleView()">Toggle Map</button>
+ </div>
+ <div class="ms-auto">
+ <small class="text-muted">
+ <span class="status-indicator status-offline" id="data-status"></span>
+ <span id="data-status-text">Using mock data (offline mode)</span>
+ </small>
+ </div>
+ </div>
+ <div class="control-row">
+ <div class="control-group">
+ <label>Map Layers</label>
+ <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+ <label class="form-check-label">
+ <input type="checkbox" id="show-plants" checked class="form-check-input"> Power Plants
+ </label>
+ <label class="form-check-label">
+ <input type="checkbox" id="show-transmission" checked class="form-check-input"> Transmission Lines
+ </label>
+ <label class="form-check-label">
+ <input type="checkbox" id="show-regions" checked class="form-check-input"> BA Regions
+ </label>
+ <label class="form-check-label">
+ <input type="checkbox" id="cluster-markers" checked class="form-check-input"> Cluster Markers
+ </label>
+ </div>
+ </div>
+ <div class="control-group">
+ <label>EIA Dataset</label>
+ <span id="eia-dataset-info" class="text-muted">Loading...</span>
+ </div>
+ </div>
+ </div>
+ <div class="chart-section">
+ <div class="chart-header">
+ <h3>Load Forecast</h3>
+ </div>
+ <div class="chart-content">
+ <div class="metrics-grid" id="forecast-metrics">
+ <div class="metric-card">
+ <div class="metric-value" id="peak-load">--</div>
+ <div class="metric-label">Peak Load (MW)</div>
+ </div>
+ <div class="metric-card">
+ <div class="metric-value" id="avg-load">--</div>
+ <div class="metric-label">Avg Load (MW)</div>
+ </div>
+ <div class="metric-card">
+ <div class="metric-value" id="load-factor">--</div>
+ <div class="metric-label">Load Factor</div>
+ </div>
+ <div class="metric-card">
+ <div class="metric-value" id="forecast-error">--</div>
+ <div class="metric-label">MAPE (%)</div>
+ </div>
+ </div>
+ <canvas id="forecast-chart" width="400" height="200"></canvas>
+ </div>
+ </div>
+ 
+ <div class="chart-section">
+ <div class="chart-header">
+ <h3>Historical Load</h3>
+ </div>
+ <div class="chart-content">
+ <canvas id="historical-chart" width="400" height="200"></canvas>
+ </div>
+ </div>
+ 
+ <div class="chart-section">
+ <div class="chart-header">
+ <h3>Scenario Comparison</h3>
+ </div>
+ <div class="chart-content">
+ <canvas id="scenario-chart" width="400" height="200"></canvas>
+ </div>
+ </div>
+ 
+ <div class="chart-section">
+ <div class="chart-header">
+ <h3>Transmission Infrastructure (HIFLD)</h3>
+ </div>
+ <div class="chart-content">
+ <div class="metrics-grid" id="transmission-metrics">
+ <div class="metric-card">
+ <div class="metric-value" id="total-lines">--</div>
+ <div class="metric-label">Total Lines</div>
+ </div>
+ <div class="metric-card">
+ <div class="metric-value" id="lines-in-service">--</div>
+ <div class="metric-label">In Service</div>
+ </div>
+ <div class="metric-card">
+ <div class="metric-value" id="total-utilities">--</div>
+ <div class="metric-label">Utilities</div>
+ </div>
+ <div class="metric-card">
+ <div class="metric-value" id="total-length">--</div>
+ <div class="metric-label">Total Miles</div>
+ </div>
+ <div class="metric-card">
+ <div class="metric-value" id="avg-voltage">--</div>
+ <div class="metric-label">Avg Voltage (kV)</div>
+ </div>
+ <div class="metric-card">
+ <div class="metric-value" id="voltage-classes">--</div>
+ <div class="metric-label">Voltage Classes</div>
+ </div>
+ </div>
+ <div style="margin-top: 20px;">
+ <h5>Infrastructure Breakdown</h5>
+ <div class="row">
+ <div class="col-md-6">
+ <canvas id="transmission-type-chart" width="200" height="200"></canvas>
+ </div>
+ <div class="col-md-6">
+ <canvas id="voltage-distribution-chart" width="200" height="200"></canvas>
+ </div>
+ </div>
+ </div>
+ </div>
+ </div>
+ 
+ <div class="chart-section">
+ <div class="chart-header">
+ <h3>EIA Power Plant Data</h3>
+ </div>
+ <div class="chart-content">
+ <div class="metrics-grid" id="eia-metrics">
+ <div class="metric-card">
+ <div class="metric-value" id="total-plants">--</div>
+ <div class="metric-label">Total Plants</div>
+ </div>
+ <div class="metric-card">
+ <div class="metric-value" id="total-states">--</div>
+ <div class="metric-label">States Covered</div>
+ </div>
+ <div class="metric-card">
+ <div class="metric-value" id="data-records">--</div>
+ <div class="metric-label">Data Records</div>
+ </div>
+ <div class="metric-card">
+ <div class="metric-value" id="dataset-size">--</div>
+ <div class="metric-label">Dataset Size (MB)</div>
+ </div>
+ <div class="metric-card">
+ <div class="metric-value" id="series-types">--</div>
+ <div class="metric-label">Series Types</div>
+ </div>
+ <div class="metric-card">
+ <div class="metric-value" id="date-coverage">--</div>
+ <div class="metric-label">Date Coverage</div>
+ </div>
+ </div>
+ <div style="margin-top: 20px;">
+ <div class="row">
+ <div class="col-md-6">
+ <h5>Plant Search</h5>
+ <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+ <input type="text" id="plant-search" placeholder="Search plants by name, fuel type, or location..." style="flex: 1; padding: 8px;">
+ <button class="btn btn-primary btn-sm" onclick="searchPlants()">Search</button>
+ </div>
+ <div id="plant-search-results" style="max-height: 200px; overflow-y: auto;"></div>
+ </div>
+ <div class="col-md-6">
+ <h5>Fuel Type Distribution</h5>
+ <canvas id="fuel-type-chart" width="200" height="200"></canvas>
+ </div>
+ </div>
+ </div>
+ </div>
+ </div>
+ 
+ <div class="chart-section">
+ <div class="chart-header">
+ <h3>Geographic Data Summary</h3>
+ </div>
+ <div class="chart-content">
+ <div class="metrics-grid" id="geographic-metrics">
+ <div class="metric-card">
+ <div class="metric-value" id="mapped-plants">--</div>
+ <div class="metric-label">Mapped Plants</div>
+ </div>
+ <div class="metric-card">
+ <div class="metric-value" id="mapped-lines">--</div>
+ <div class="metric-label">Mapped Lines</div>
+ </div>
+ <div class="metric-card">
+ <div class="metric-value" id="coverage-area">--</div>
+ <div class="metric-label">Coverage Area</div>
+ </div>
+ <div class="metric-card">
+ <div class="metric-value" id="data-density">--</div>
+ <div class="metric-label">Data Density</div>
+ </div>
+ </div>
+ <div style="margin-top: 20px;">
+ <h5>State Coverage</h5>
+ <div id="state-coverage-list" style="max-height: 200px; overflow-y: auto;">
+ <div class="loading">Loading state coverage data...</div>
+ </div>
+ </div>
+ </div>
+ </div>
+ 
+ <div class="chart-section">
+ <div class="chart-header">
+ <h3>Weather Data (Open-Meteo)</h3>
+ </div>
+ <div class="chart-content">
+ <div class="metrics-grid" id="weather-metrics">
+ <div class="metric-card">
+ <div class="metric-value" id="weather-temperature">--</div>
+ <div class="metric-label">Temperature (°F)</div>
+ </div>
+ <div class="metric-card">
+ <div class="metric-value" id="weather-conditions">--</div>
+ <div class="metric-label">Conditions</div>
+ </div>
+ <div class="metric-card">
+ <div class="metric-value" id="weather-wind">--</div>
+ <div class="metric-label">Wind Speed</div>
+ </div>
+ <div class="metric-card">
+ <div class="metric-value" id="weather-updated">--</div>
+ <div class="metric-label">Last Updated</div>
+ </div>
+ </div>
+ <div style="margin-top: 20px;">
+ <h5>7-Day Temperature Forecast</h5>
+ <canvas id="temperatureForecastChart" width="400" height="200"></canvas>
+ </div>
+ </div>
+ </div>
+ 
+ <div class="chart-section">
+ <div class="chart-header">
+ <h3>Data Quality & Status</h3>
+ </div>
+ <div class="chart-content">
+ <div class="metrics-grid" id="data-quality-metrics">
+ <div class="metric-card">
+ <div class="metric-value" id="data-freshness">--</div>
+ <div class="metric-label">Data Freshness</div>
+ </div>
+ <div class="metric-card">
+ <div class="metric-value" id="data-completeness">--</div>
+ <div class="metric-label">Completeness</div>
+ </div>
+ <div class="metric-card">
+ <div class="metric-value" id="api-status">--</div>
+ <div class="metric-label">API Status</div>
+ </div>
+ <div class="metric-card">
+ <div class="metric-value" id="last-update">--</div>
+ <div class="metric-label">Last Update</div>
+ </div>
+ </div>
+ <div style="margin-top: 20px;">
+ <h5>Dataset Health</h5>
+ <div id="dataset-health" class="loading">Loading dataset health information...</div>
+ </div>
+ </div>
+ </div>
+ 
+ <div class="chart-section">
+ <div class="chart-header">
+ <h3>Power Outage Data (EAGLE-I)</h3>
+ </div>
+ <div class="chart-content">
+ <div class="metrics-grid" id="outage-metrics">
+ <div class="metric-card">
+ <div class="metric-value" id="total-outage-years">--</div>
+ <div class="metric-label">Years Available</div>
+ </div>
+ <div class="metric-card">
+ <div class="metric-value" id="total-outage-records">--</div>
+ <div class="metric-label">Total Records</div>
+ </div>
+ <div class="metric-card">
+ <div class="metric-value" id="outage-dataset-size">--</div>
+ <div class="metric-label">Dataset Size (MB)</div>
+ </div>
+ <div class="metric-card">
+ <div class="metric-value" id="outage-frequency">--</div>
+ <div class="metric-label">Data Frequency</div>
+ </div>
+ </div>
+ <div style="margin-top: 20px;">
+ <div class="row">
+ <div class="col-md-6">
+ <h5>Outage Analysis</h5>
+ <div style="margin-bottom: 15px;">
+ <label>Year:</label>
+ <select id="outage-year-select" style="margin-left: 10px; padding: 4px;">
+ <option value="2024">2024</option>
+ <option value="2022">2022</option>
+ <option value="2021">2021</option>
+ <option value="2020">2020</option>
+ </select>
+ <button class="btn btn-primary btn-sm" onclick="loadOutageData()" style="margin-left: 10px;">Load Data</button>
+ </div>
+ <div id="outage-analysis-results" style="max-height: 200px; overflow-y: auto;">
+ <div class="loading">Select a year and click "Load Data" to view outage analysis</div>
+ </div>
+ </div>
+ <div class="col-md-6">
+ <h5>Major Outage Events</h5>
+ <div id="major-outage-events" style="max-height: 200px; overflow-y: auto;">
+ <div class="loading">Loading major outage events...</div>
+ </div>
+ </div>
+ </div>
+ </div>
+ </div>
+ </div>
+ 
+ <div class="chart-section">
+ <div class="chart-header">
+ <h3>Model Performance</h3>
+ </div>
+ <div class="chart-content">
+ <div id="model-metrics" class="loading">
+ Select a balancing authority to view model performance
+ </div>
+ </div>
+ </div>
+ </div>
+ </div>
+</div>
+
+<script>
+// Global variables
+let currentBA = null;
+let forecastChart = null;
+let historicalChart = null;
+let scenarioChart = null;
+let transmissionTypeChart = null;
+let voltageDistributionChart = null;
+let fuelTypeChart = null;
+let leapMap = null;
+let powerPlantMarkers = [];
+let transmissionLayers = [];
+let regionMarkers = [];
+let powerPlantCluster = null;
+let transmissionCluster = null;
+
+// Initialize the application
+document.addEventListener('DOMContentLoaded', function() {
+ initializeMap();
+ initializeCharts();
+ setupResizeHandle();
+ setupEventListeners();
+ 
+ // Set status indicators
+ updateStatusIndicator('offline');
+ updateDataStatusIndicator();
+ 
+ // Load all dataset information
+ loadEIADatasetInfo();
+ loadTransmissionStats();
+ loadGeographicSummary();
+ loadDataQualityInfo();
+ loadOutageDatasetInfo();
+ loadWeatherData();
+ 
+ // Load power plants and transmission lines on map
+ loadPowerPlantsOnMap();
+ loadTransmissionLinesOnMap();
+});
+
+function initializeMap() {
+ // Initialize Leaflet map
+ leapMap = L.map('leap-map', {
+ center: [39.8283, -98.5795], // Center of US
+ zoom: 4,
+ zoomControl: true
+ });
+ 
+ // Add tile layer
+ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+ attribution: '© OpenStreetMap contributors'
+ }).addTo(leapMap);
+ 
+ // Initialize marker clusters
+ powerPlantCluster = L.markerClusterGroup({
+ iconCreateFunction: function(cluster) {
+ const count = cluster.getChildCount();
+ let size = 'small';
+ if (count > 100) size = 'large';
+ else if (count > 10) size = 'medium';
+ 
+ return L.divIcon({
+ html: `<div><span>${count}</span></div>`,
+ className: `marker-cluster marker-cluster-${size} power-plant-cluster`,
+ iconSize: L.point(40, 40)
+ });
+ }
+ });
+ 
+ transmissionCluster = L.markerClusterGroup({
+ iconCreateFunction: function(cluster) {
+ const count = cluster.getChildCount();
+ let size = 'small';
+ if (count > 100) size = 'large';
+ else if (count > 10) size = 'medium';
+ 
+ return L.divIcon({
+ html: `<div><span>${count}</span></div>`,
+ className: `marker-cluster marker-cluster-${size} transmission-cluster`,
+ iconSize: L.point(40, 40)
+ });
+ }
+ });
+ 
+ // Add clusters to map initially
+ leapMap.addLayer(powerPlantCluster);
+ leapMap.addLayer(transmissionCluster);
+ 
+ // Add region markers for major balancing authorities
+ const regions = [
+ {lat: 37.7749, lng: -122.4194, name: "CAISO", ba: "CAL-ALL", color: "#007bff"},
+ {lat: 32.7767, lng: -96.7970, name: "ERCOT", ba: "TEX-ALL", color: "#28a745"},
+ {lat: 39.9526, lng: -75.1652, name: "PJM", ba: "PJM-ALL", color: "#dc3545"},
+ {lat: 41.8781, lng: -87.6298, name: "MISO", ba: "MISO-ALL", color: "#ffc107"},
+ {lat: 40.7128, lng: -74.0060, name: "NYISO", ba: "NYIS-ALL", color: "#6f42c1"}
+ ];
+ 
+ regions.forEach(region => {
+ const marker = L.circleMarker([region.lat, region.lng], {
+ radius: 12,
+ fillColor: region.color,
+ color: '#fff',
+ weight: 2,
+ opacity: 1,
+ fillOpacity: 0.8
+ }).addTo(leapMap)
+ .bindPopup(`<b>${region.name}</b><br>${region.ba}<br><small>Click to select this region</small>`)
+ .on('click', function() {
+ document.getElementById('ba-select').value = region.ba;
+ selectBA(region.ba);
+ });
+ 
+ regionMarkers.push(marker);
+ });
+}
+
+function initializeCharts() {
+ // Forecast chart
+ const forecastCtx = document.getElementById('forecast-chart').getContext('2d');
+ forecastChart = new Chart(forecastCtx, {
+ type: 'line',
+ data: {
+ labels: [],
+ datasets: [{
+ label: 'Forecast Load (MW)',
+ data: [],
+ borderColor: '#007bff',
+ backgroundColor: 'rgba(0, 123, 255, 0.1)',
+ tension: 0.1
+ }]
+ },
+ options: {
+ responsive: true,
+ scales: {
+ x: {
+ type: 'time',
+ time: {
+ unit: 'hour'
+ }
+ },
+ y: {
+ beginAtZero: false,
+ title: {
+ display: true,
+ text: 'Load (MW)'
+ }
+ }
+ }
+ }
+ });
+ 
+ // Historical chart
+ const historicalCtx = document.getElementById('historical-chart').getContext('2d');
+ historicalChart = new Chart(historicalCtx, {
+ type: 'line',
+ data: {
+ labels: [],
+ datasets: [{
+ label: 'Historical Load (MW)',
+ data: [],
+ borderColor: '#28a745',
+ backgroundColor: 'rgba(40, 167, 69, 0.1)',
+ tension: 0.1
+ }]
+ },
+ options: {
+ responsive: true,
+ scales: {
+ x: {
+ type: 'time',
+ time: {
+ unit: 'hour'
+ }
+ },
+ y: {
+ beginAtZero: false,
+ title: {
+ display: true,
+ text: 'Load (MW)'
+ }
+ }
+ }
+ }
+ });
+ 
+ // Scenario chart
+ const scenarioCtx = document.getElementById('scenario-chart').getContext('2d');
+ scenarioChart = new Chart(scenarioCtx, {
+ type: 'line',
+ data: {
+ labels: [],
+ datasets: []
+ },
+ options: {
+ responsive: true,
+ scales: {
+ x: {
+ type: 'time',
+ time: {
+ unit: 'hour'
+ }
+ },
+ y: {
+ beginAtZero: false,
+ title: {
+ display: true,
+ text: 'Load (MW)'
+ }
+ }
+ }
+ }
+ });
+ 
+ // Initialize transmission type chart
+ const transmissionTypeCtx = document.getElementById('transmission-type-chart').getContext('2d');
+ transmissionTypeChart = new Chart(transmissionTypeCtx, {
+ type: 'doughnut',
+ data: {
+ labels: ['Overhead', 'Underground', 'Other'],
+ datasets: [{
+ data: [0, 0, 0],
+ backgroundColor: ['#007bff', '#28a745', '#ffc107'],
+ borderWidth: 2
+ }]
+ },
+ options: {
+ responsive: true,
+ plugins: {
+ legend: {
+ position: 'bottom'
+ },
+ title: {
+ display: true,
+ text: 'Line Types'
+ }
+ }
+ }
+ });
+ 
+ // Initialize voltage distribution chart
+ const voltageDistributionCtx = document.getElementById('voltage-distribution-chart').getContext('2d');
+ voltageDistributionChart = new Chart(voltageDistributionCtx, {
+ type: 'bar',
+ data: {
+ labels: [],
+ datasets: [{
+ label: 'Lines',
+ data: [],
+ backgroundColor: '#007bff',
+ borderColor: '#0056b3',
+ borderWidth: 1
+ }]
+ },
+ options: {
+ responsive: true,
+ plugins: {
+ legend: {
+ display: false
+ },
+ title: {
+ display: true,
+ text: 'Voltage Classes'
+ }
+ },
+ scales: {
+ y: {
+ beginAtZero: true
+ }
+ }
+ }
+ });
+ 
+ // Initialize fuel type chart
+ const fuelTypeCtx = document.getElementById('fuel-type-chart').getContext('2d');
+ fuelTypeChart = new Chart(fuelTypeCtx, {
+ type: 'doughnut',
+ data: {
+ labels: [],
+ datasets: [{
+ data: [],
+ backgroundColor: ['#007bff', '#28a745', '#dc3545', '#ffc107', '#6f42c1', '#fd7e14', '#20c997'],
+ borderWidth: 2
+ }]
+ },
+ options: {
+ responsive: true,
+ plugins: {
+ legend: {
+ position: 'bottom'
+ },
+ title: {
+ display: true,
+ text: 'Fuel Types'
+ }
+ }
+ }
+ });
+}
+
+function setupResizeHandle() {
+ const resizeHandle = document.getElementById('resize-handle');
+ const container = document.querySelector('.leap-container');
+ const mapPane = document.querySelector('.map-pane');
+ const chartsPane = document.querySelector('.charts-pane');
+ 
+ let isResizing = false;
+ 
+ resizeHandle.addEventListener('mousedown', function(e) {
+ isResizing = true;
+ document.addEventListener('mousemove', handleResize);
+ document.addEventListener('mouseup', stopResize);
+ });
+ 
+ function handleResize(e) {
+ if (!isResizing) return;
+ 
+ const containerRect = container.getBoundingClientRect();
+ const newMapWidth = e.clientX - containerRect.left;
+ const containerWidth = containerRect.width;
+ 
+ if (newMapWidth > 200 && newMapWidth < containerWidth - 200) {
+ const mapPercent = (newMapWidth / containerWidth) * 100;
+ const chartsPercent = 100 - mapPercent;
+ 
+ mapPane.style.flex = `0 0 ${mapPercent}%`;
+ chartsPane.style.flex = `0 0 ${chartsPercent}%`;
+ 
+ // Trigger map resize
+ if (leapMap) {
+ setTimeout(() => leapMap.invalidateSize(), 100);
+ }
+ }
+ }
+ 
+ function stopResize() {
+ isResizing = false;
+ document.removeEventListener('mousemove', handleResize);
+ document.removeEventListener('mouseup', stopResize);
+ }
+}
+
+function setupEventListeners() {
+ document.getElementById('ba-select').addEventListener('change', function() {
+ const ba = this.value;
+ if (ba) {
+ selectBA(ba);
+ }
+ });
+ 
+ // Map layer toggles
+ document.getElementById('show-plants').addEventListener('change', function() {
+ togglePowerPlants(this.checked);
+ });
+ 
+ document.getElementById('show-transmission').addEventListener('change', function() {
+ toggleTransmissionLines(this.checked);
+ });
+ 
+ document.getElementById('show-regions').addEventListener('change', function() {
+ toggleRegionMarkers(this.checked);
+ });
+ 
+ document.getElementById('cluster-markers').addEventListener('change', function() {
+ toggleClustering(this.checked);
+ });
+ 
+ // Plant search
+ document.getElementById('plant-search').addEventListener('keypress', function(e) {
+ if (e.key === 'Enter') {
+ searchPlants();
+ }
+ });
+}
+
+function selectBA(ba) {
+ currentBA = ba;
+ updateStatusIndicator('loading');
+ 
+ // Load historical data
+ loadHistoricalData(ba);
+ 
+ // Load forecast
+ updateForecast();
+ 
+ // Load model metrics
+ loadModelMetrics(ba);
+}
+
+function loadHistoricalData(ba) {
+ fetch(`/api/leap/load/${ba}?limit=168`)
+ .then(response => response.json())
+ .then(data => {
+ if (data.error) {
+ console.error('Error loading historical data:', data.error);
+ return;
+ }
+ 
+ const loadData = data.data;
+ const labels = loadData.map(d => new Date(d.ts_utc));
+ const values = loadData.map(d => d.mw);
+ 
+ historicalChart.data.labels = labels;
+ historicalChart.data.datasets[0].data = values;
+ historicalChart.update();
+ })
+ .catch(error => {
+ console.error('Error loading historical data:', error);
+ });
+}
+
+function updateForecast() {
+ if (!currentBA) return;
+ 
+ const horizon = document.getElementById('horizon-select').value;
+ const scenario = document.getElementById('scenario-select').value;
+ 
+ updateStatusIndicator('loading');
+ 
+ fetch(`/api/leap/forecast/${currentBA}?horizon=${horizon}&scenario=${scenario}`)
+ .then(response => response.json())
+ .then(data => {
+ if (data.error) {
+ console.error('Error loading forecast:', data.error);
+ updateStatusIndicator('offline');
+ return;
+ }
+ 
+ const forecastData = data.forecast;
+ const labels = forecastData.map(d => new Date(d.ts_utc));
+ const values = forecastData.map(d => d.mw_forecast);
+ 
+ forecastChart.data.labels = labels;
+ forecastChart.data.datasets[0].data = values;
+ forecastChart.update();
+ 
+ // Update metrics
+ updateForecastMetrics(values);
+ 
+ // Load scenario comparison
+ loadScenarioComparison();
+ 
+ updateStatusIndicator('online');
+ })
+ .catch(error => {
+ console.error('Error loading forecast:', error);
+ updateStatusIndicator('offline');
+ });
+}
+
+function loadScenarioComparison() {
+ if (!currentBA) return;
+ 
+ const horizon = document.getElementById('horizon-select').value;
+ 
+ fetch(`/api/leap/scenarios/${currentBA}?horizon=${horizon}&scenarios=baseline,high_growth,hot_weather,demand_response`)
+ .then(response => response.json())
+ .then(data => {
+ if (data.error) {
+ console.error('Error loading scenarios:', data.error);
+ return;
+ }
+ 
+ const scenarios = data.scenarios;
+ const colors = {
+ 'baseline': '#007bff',
+ 'high_growth': '#28a745',
+ 'hot_weather': '#dc3545',
+ 'demand_response': '#ffc107'
+ };
+ 
+ scenarioChart.data.datasets = [];
+ 
+ Object.keys(scenarios).forEach(scenarioId => {
+ const scenarioData = scenarios[scenarioId];
+ const labels = scenarioData.map(d => new Date(d.ts_utc));
+ const values = scenarioData.map(d => d.mw_forecast);
+ 
+ scenarioChart.data.labels = labels;
+ scenarioChart.data.datasets.push({
+ label: scenarioId.replace('_', ' ').toUpperCase(),
+ data: values,
+ borderColor: colors[scenarioId] || '#666',
+ backgroundColor: 'transparent',
+ tension: 0.1
+ });
+ });
+ 
+ scenarioChart.update();
+ })
+ .catch(error => {
+ console.error('Error loading scenarios:', error);
+ });
+}
+
+function loadModelMetrics(ba) {
+ fetch(`/api/leap/metrics/${ba}`)
+ .then(response => response.json())
+ .then(data => {
+ if (data.error) {
+ console.error('Error loading metrics:', data.error);
+ return;
+ }
+ 
+ const metrics = data.metrics;
+ let metricsHtml = '<div class="metrics-grid">';
+ 
+ metrics.forEach(metric => {
+ metricsHtml += `
+ <div class="metric-card">
+ <div class="metric-value">${metric.metric_value.toFixed(3)}</div>
+ <div class="metric-label">${metric.metric_name}</div>
+ </div>
+ `;
+ });
+ 
+ metricsHtml += '</div>';
+ document.getElementById('model-metrics').innerHTML = metricsHtml;
+ })
+ .catch(error => {
+ console.error('Error loading metrics:', error);
+ document.getElementById('model-metrics').innerHTML = '<div class="error">Failed to load model metrics</div>';
+ });
+}
+
+function updateForecastMetrics(values) {
+ if (values.length === 0) return;
+ 
+ const peak = Math.max(...values);
+ const avg = values.reduce((a, b) => a + b, 0) / values.length;
+ const loadFactor = avg / peak;
+ 
+ document.getElementById('peak-load').textContent = Math.round(peak).toLocaleString();
+ document.getElementById('avg-load').textContent = Math.round(avg).toLocaleString();
+ document.getElementById('load-factor').textContent = (loadFactor * 100).toFixed(1) + '%';
+}
+
+function updateStatusIndicator(status) {
+ const indicator = document.getElementById('status-indicator');
+ indicator.className = `status-indicator status-${status}`;
+}
+
+function updateDataStatusIndicator() {
+ const indicator = document.getElementById('data-status');
+ const textElement = document.getElementById('data-status-text');
+ 
+ // Check if we're in offline mode by testing an API endpoint
+ fetch('/api/health')
+ .then(response => response.json())
+ .then(data => {
+ if (data.offline_mode) {
+ indicator.className = 'status-indicator status-offline';
+ textElement.textContent = 'Using mock data (offline mode)';
+ } else {
+ indicator.className = 'status-indicator status-online';
+ textElement.textContent = 'Using real data (online mode)';
+ }
+ })
+ .catch(() => {
+ indicator.className = 'status-indicator status-offline';
+ textElement.textContent = 'Using mock data (offline mode)';
+ });
+}
+
+// Enhanced Data Loading Functions
+function loadEIADatasetInfo() {
+ fetch('/api/leap/eia/stats')
+ .then(response => response.json())
+ .then(data => {
+ if (data.error) {
+ console.error('Error loading EIA stats:', data.error);
+ return;
+ }
+ 
+ // Update EIA metrics
+ document.getElementById('total-plants').textContent = data.sample_parsed || '--';
+ document.getElementById('total-states').textContent = data.states_count || '--';
+ document.getElementById('data-records').textContent = (data.total_records || 0).toLocaleString();
+ document.getElementById('dataset-size').textContent = data.file_size_mb || '--';
+ document.getElementById('series-types').textContent = data.series_types_count || '--';
+ 
+ // Calculate date coverage
+ const dateRanges = data.date_range_sample || [];
+ if (dateRanges.length > 0) {
+ const startYear = Math.min(...dateRanges.map(d => new Date(d[0]).getFullYear()));
+ const endYear = Math.max(...dateRanges.map(d => new Date(d[1]).getFullYear()));
+ document.getElementById('date-coverage').textContent = `${startYear}-${endYear}`;
+ }
+ 
+ // Update dataset info
+ const infoText = `${(data.total_records || 0).toLocaleString()} records, ${data.states_count || 0} states`;
+ document.getElementById('eia-dataset-info').textContent = infoText;
+ 
+ // Update fuel type chart
+ updateFuelTypeChart(data.unique_series_types || []);
+ })
+ .catch(error => {
+ console.error('Error loading EIA dataset info:', error);
+ document.getElementById('eia-dataset-info').textContent = 'Failed to load';
+ });
+}
+
+function loadTransmissionStats() {
+ fetch('/api/leap/transmission/stats')
+ .then(response => response.json())
+ .then(data => {
+ if (data.error) {
+ console.error('Error loading transmission stats:', data.error);
+ return;
+ }
+ 
+ // Update transmission metrics
+ document.getElementById('total-lines').textContent = (data.total_lines || 0).toLocaleString();
+ document.getElementById('lines-in-service').textContent = (data.in_service || 0).toLocaleString();
+ document.getElementById('total-utilities').textContent = (data.unique_owners || 0).toLocaleString();
+ document.getElementById('total-length').textContent = Math.round(data.total_length_miles || 0).toLocaleString();
+ document.getElementById('avg-voltage').textContent = Math.round(data.avg_voltage || 0);
+ document.getElementById('voltage-classes').textContent = data.voltage_classes || '--';
+ 
+ // Update transmission type chart
+ const overheadLines = data.overhead_lines || 0;
+ const undergroundLines = data.underground_lines || 0;
+ const otherLines = (data.total_lines || 0) - overheadLines - undergroundLines;
+ 
+ transmissionTypeChart.data.datasets[0].data = [overheadLines, undergroundLines, otherLines];
+ transmissionTypeChart.update();
+ 
+ // Load voltage distribution
+ loadVoltageDistribution();
+ })
+ .catch(error => {
+ console.error('Error loading transmission stats:', error);
+ });
+}
+
+function loadVoltageDistribution() {
+ fetch('/api/leap/transmission/voltage-classes')
+ .then(response => response.json())
+ .then(data => {
+ if (data.error) {
+ console.error('Error loading voltage classes:', data.error);
+ return;
+ }
+ 
+ const voltageClasses = data.voltage_classes || [];
+ const labels = voltageClasses.map(v => v.voltage_class);
+ const counts = voltageClasses.map(v => v.count);
+ 
+ voltageDistributionChart.data.labels = labels;
+ voltageDistributionChart.data.datasets[0].data = counts;
+ voltageDistributionChart.update();
+ })
+ .catch(error => {
+ console.error('Error loading voltage distribution:', error);
+ });
+}
+
+function loadGeographicSummary() {
+ Promise.all([
+ fetch('/api/leap/eia/geography').then(r => r.json()),
+ fetch('/api/leap/transmission/stats').then(r => r.json())
+ ]).then(([eiaData, transmissionData]) => {
+ const plantLocations = eiaData.plant_locations || [];
+ const stateCounts = eiaData.state_counts || {};
+ 
+ // Update geographic metrics
+ document.getElementById('mapped-plants').textContent = plantLocations.length.toLocaleString();
+ document.getElementById('mapped-lines').textContent = (transmissionData.total_lines || 0).toLocaleString();
+ document.getElementById('coverage-area').textContent = `${Object.keys(stateCounts).length} States`;
+ 
+ // Calculate data density (plants per 1000 miles of transmission)
+ const density = plantLocations.length / ((transmissionData.total_length_miles || 1) / 1000);
+ document.getElementById('data-density').textContent = density.toFixed(1) + '/1k mi';
+ 
+ // Update state coverage list
+ updateStateCoverageList(stateCounts);
+ }).catch(error => {
+ console.error('Error loading geographic summary:', error);
+ });
+}
+
+function updateFuelTypeChart(seriesTypes) {
+ // Extract fuel types from series types
+ const fuelTypes = {};
+ seriesTypes.forEach(type => {
+ // Parse fuel types from EIA series types (e.g., CONS_EG -> Coal, GEN -> Generation)
+ if (type.includes('COL') || type.includes('COAL')) fuelTypes['Coal'] = (fuelTypes['Coal'] || 0) + 1;
+ else if (type.includes('NG') || type.includes('GAS')) fuelTypes['Natural Gas'] = (fuelTypes['Natural Gas'] || 0) + 1;
+ else if (type.includes('NUC')) fuelTypes['Nuclear'] = (fuelTypes['Nuclear'] || 0) + 1;
+ else if (type.includes('HYD')) fuelTypes['Hydro'] = (fuelTypes['Hydro'] || 0) + 1;
+ else if (type.includes('WND')) fuelTypes['Wind'] = (fuelTypes['Wind'] || 0) + 1;
+ else if (type.includes('SUN') || type.includes('SOL')) fuelTypes['Solar'] = (fuelTypes['Solar'] || 0) + 1;
+ else fuelTypes['Other'] = (fuelTypes['Other'] || 0) + 1;
+ });
+ 
+ const labels = Object.keys(fuelTypes);
+ const data = Object.values(fuelTypes);
+ 
+ fuelTypeChart.data.labels = labels;
+ fuelTypeChart.data.datasets[0].data = data;
+ fuelTypeChart.update();
+}
+
+function updateStateCoverageList(stateCounts) {
+ const sortedStates = Object.entries(stateCounts)
+ .sort(([,a], [,b]) => b - a)
+ .slice(0, 20); // Top 20 states
+ 
+ let html = '<div class="row">';
+ sortedStates.forEach(([state, count], index) => {
+ if (index % 10 === 0 && index > 0) html += '</div><div class="row">';
+ html += `
+ <div class="col-6 mb-2">
+ <div class="d-flex justify-content-between">
+ <span class="fw-bold">${state}</span>
+ <span class="text-muted">${count.toLocaleString()}</span>
+ </div>
+ </div>
+ `;
+ });
+ html += '</div>';
+ 
+ document.getElementById('state-coverage-list').innerHTML = html;
+}
+
+function loadDataQualityInfo() {
+ // Load data quality metrics
+ Promise.all([
+ fetch('/api/health').then(r => r.json()),
+ fetch('/api/leap/eia/stats').then(r => r.json()),
+ fetch('/api/leap/transmission/stats').then(r => r.json())
+ ]).then(([healthData, eiaData, transmissionData]) => {
+ // Calculate data freshness (days since last update)
+ const now = new Date();
+ let freshnessDays = 'Unknown';
+ if (eiaData.date_range_sample && eiaData.date_range_sample.length > 0) {
+ const latestDate = new Date(Math.max(...eiaData.date_range_sample.map(d => new Date(d[1]))));
+ freshnessDays = Math.floor((now - latestDate) / (1000 * 60 * 60 * 24));
+ }
+ 
+ // Calculate completeness percentage
+ const expectedRecords = 1000000; // Rough estimate
+ const actualRecords = eiaData.total_records || 0;
+ const completeness = Math.min(100, (actualRecords / expectedRecords) * 100);
+ 
+ // Update quality metrics
+ document.getElementById('data-freshness').textContent = freshnessDays === 'Unknown' ? '--' : `${freshnessDays} days`;
+ document.getElementById('data-completeness').textContent = `${completeness.toFixed(1)}%`;
+ document.getElementById('api-status').textContent = healthData.offline_mode ? 'Offline' : 'Online';
+ document.getElementById('last-update').textContent = new Date().toLocaleDateString();
+ 
+ // Update dataset health
+ updateDatasetHealth(eiaData, transmissionData, healthData);
+ }).catch(error => {
+ console.error('Error loading data quality info:', error);
+ document.getElementById('dataset-health').innerHTML = '<div class="error">Failed to load data quality information</div>';
+ });
+}
+
+function updateDatasetHealth(eiaData, transmissionData, healthData) {
+ const datasets = [
+ {
+ name: 'EIA Power Plant Data',
+ status: eiaData.total_records > 0 ? 'healthy' : 'warning',
+ records: eiaData.total_records || 0,
+ size: eiaData.file_size_mb || 0,
+ issues: eiaData.total_records > 500000 ? [] : ['Low record count']
+ },
+ {
+ name: 'HIFLD Transmission Lines',
+ status: transmissionData.total_lines > 0 ? 'healthy' : 'error',
+ records: transmissionData.total_lines || 0,
+ size: Math.round((transmissionData.total_lines || 0) * 0.001), // Rough estimate
+ issues: transmissionData.total_lines > 50000 ? [] : ['Incomplete dataset']
+ },
+ {
+ name: 'API Connectivity',
+ status: healthData.offline_mode ? 'warning' : 'healthy',
+ records: 'N/A',
+ size: 'N/A',
+ issues: healthData.offline_mode ? ['Operating in offline mode'] : []
+ }
+ ];
+ 
+ let html = '<div class="row">';
+ datasets.forEach((dataset, index) => {
+ const statusColor = dataset.status === 'healthy' ? '#28a745' : 
+ dataset.status === 'warning' ? '#ffc107' : '#dc3545';
+ const statusIcon = dataset.status === 'healthy' ? '' : 
+ dataset.status === 'warning' ? '' : '';
+ 
+ html += `
+ <div class="col-md-4 mb-3">
+ <div class="card h-100">
+ <div class="card-body">
+ <h6 class="card-title">
+ <span style="color: ${statusColor}; font-weight: bold;">${statusIcon}</span>
+ ${dataset.name}
+ </h6>
+ <div class="small text-muted">
+ <div>Records: ${typeof dataset.records === 'number' ? dataset.records.toLocaleString() : dataset.records}</div>
+ <div>Size: ${typeof dataset.size === 'number' ? dataset.size + ' MB' : dataset.size}</div>
+ ${dataset.issues.length > 0 ? `<div class="text-warning mt-1">Issues: ${dataset.issues.join(', ')}</div>` : ''}
+ </div>
+ </div>
+ </div>
+ </div>
+ `;
+ });
+ html += '</div>';
+ 
+ document.getElementById('dataset-health').innerHTML = html;
+}
+
+function loadPowerPlantsOnMap() {
+ fetch('/api/leap/eia/geography')
+ .then(response => response.json())
+ .then(data => {
+ if (data.error) {
+ console.error('Error loading power plants:', data.error);
+ return;
+ }
+ 
+ // Clear existing plant markers
+ powerPlantCluster.clearLayers();
+ powerPlantMarkers = [];
+ 
+ // Add plant markers
+ const plantLocations = data.plant_locations || [];
+ plantLocations.forEach(plant => {
+ if (plant.lat && plant.lon) {
+ const marker = L.circleMarker([plant.lat, plant.lon], {
+ radius: 5,
+ fillColor: '#ff7800',
+ color: '#fff',
+ weight: 1,
+ opacity: 1,
+ fillOpacity: 0.8
+ });
+ 
+ marker.bindPopup(`
+ <div class="map-popup">
+ <h6><i class="fas fa-industry"></i> Power Plant</h6>
+ <div><strong>Name:</strong> ${plant.name || 'Unknown'}</div>
+ <div><strong>State:</strong> ${plant.state || 'Unknown'}</div>
+ <div><strong>Series ID:</strong> ${plant.series_id || 'N/A'}</div>
+ </div>
+ `);
+ 
+ powerPlantMarkers.push(marker);
+ 
+ // Add to cluster if clustering is enabled
+ if (document.getElementById('cluster-markers').checked) {
+ powerPlantCluster.addLayer(marker);
+ } else {
+ marker.addTo(leapMap);
+ }
+ }
+ });
+ 
+ console.log(`Loaded ${powerPlantMarkers.length} power plants on map`);
+ })
+ .catch(error => {
+ console.error('Error loading power plants:', error);
+ });
+}
+
+function loadTransmissionLinesOnMap() {
+ fetch('/api/leap/transmission/lines?limit=500')
+ .then(response => response.json())
+ .then(data => {
+ if (data.error) {
+ console.error('Error loading transmission lines:', data.error);
+ return;
+ }
+ 
+ // Clear existing transmission layers
+ transmissionCluster.clearLayers();
+ transmissionLayers = [];
+ 
+ // Add transmission line markers
+ const lines = data.lines || [];
+ lines.forEach(line => {
+ if (line.latitude && line.longitude) {
+ // Color code by voltage level
+ let color = '#0078ff'; // Default blue
+ const voltage = parseFloat(line.voltage) || 0;
+ if (voltage >= 500) color = '#dc3545'; // Red for high voltage
+ else if (voltage >= 230) color = '#ffc107'; // Yellow for medium-high
+ else if (voltage >= 115) color = '#28a745'; // Green for medium
+ 
+ const marker = L.circleMarker([line.latitude, line.longitude], {
+ radius: Math.min(3 + Math.log10(voltage + 1), 8),
+ fillColor: color,
+ color: '#fff',
+ weight: 1,
+ opacity: 1,
+ fillOpacity: 0.7
+ });
+ 
+ marker.bindPopup(`
+ <div class="map-popup">
+ <h6><i class="fas fa-bolt"></i> Transmission Line</h6>
+ <div><strong>Owner:</strong> ${line.OWNER || 'Unknown'}</div>
+ <div><strong>Voltage:</strong> ${line.VOLTAGE || 'Unknown'} kV</div>
+ <div><strong>Type:</strong> ${line.TYPE || 'Unknown'}</div>
+ <div><strong>Status:</strong> ${line.STATUS || 'Unknown'}</div>
+ <div><strong>Voltage Class:</strong> ${line.VOLT_CLASS || 'Unknown'}</div>
+ </div>
+ `);
+ 
+ transmissionLayers.push(marker);
+ 
+ // Add to cluster if clustering is enabled
+ if (document.getElementById('cluster-markers').checked) {
+ transmissionCluster.addLayer(marker);
+ } else {
+ marker.addTo(leapMap);
+ }
+ }
+ });
+ 
+ console.log(`Loaded ${transmissionLayers.length} transmission lines on map`);
+ })
+ .catch(error => {
+ console.error('Error loading transmission lines:', error);
+ });
+}
+
+function togglePowerPlants(show) {
+ if (show) {
+ if (document.getElementById('cluster-markers').checked) {
+ leapMap.addLayer(powerPlantCluster);
+ } else {
+ powerPlantMarkers.forEach(marker => marker.addTo(leapMap));
+ }
+ } else {
+ leapMap.removeLayer(powerPlantCluster);
+ powerPlantMarkers.forEach(marker => leapMap.removeLayer(marker));
+ }
+}
+
+function toggleTransmissionLines(show) {
+ if (show) {
+ if (document.getElementById('cluster-markers').checked) {
+ leapMap.addLayer(transmissionCluster);
+ } else {
+ transmissionLayers.forEach(layer => layer.addTo(leapMap));
+ }
+ } else {
+ leapMap.removeLayer(transmissionCluster);
+ transmissionLayers.forEach(layer => leapMap.removeLayer(layer));
+ }
+}
+
+function toggleRegionMarkers(show) {
+ regionMarkers.forEach(marker => {
+ if (show) {
+ marker.addTo(leapMap);
+ } else {
+ leapMap.removeLayer(marker);
+ }
+ });
+}
+
+function toggleClustering(useClustering) {
+ // Remove all markers from map and clusters
+ leapMap.removeLayer(powerPlantCluster);
+ leapMap.removeLayer(transmissionCluster);
+ powerPlantMarkers.forEach(marker => leapMap.removeLayer(marker));
+ transmissionLayers.forEach(layer => leapMap.removeLayer(layer));
+ 
+ // Clear clusters
+ powerPlantCluster.clearLayers();
+ transmissionCluster.clearLayers();
+ 
+ if (useClustering) {
+ // Add markers to clusters
+ powerPlantMarkers.forEach(marker => powerPlantCluster.addLayer(marker));
+ transmissionLayers.forEach(layer => transmissionCluster.addLayer(layer));
+ 
+ // Add clusters to map if layers are enabled
+ if (document.getElementById('show-plants').checked) {
+ leapMap.addLayer(powerPlantCluster);
+ }
+ if (document.getElementById('show-transmission').checked) {
+ leapMap.addLayer(transmissionCluster);
+ }
+ } else {
+ // Add markers directly to map if layers are enabled
+ if (document.getElementById('show-plants').checked) {
+ powerPlantMarkers.forEach(marker => marker.addTo(leapMap));
+ }
+ if (document.getElementById('show-transmission').checked) {
+ transmissionLayers.forEach(layer => layer.addTo(leapMap));
+ }
+ }
+}
+
+function searchPlants() {
+ const query = document.getElementById('plant-search').value.trim();
+ if (!query) {
+ document.getElementById('plant-search-results').innerHTML = '<p class="text-muted">Enter search terms to find power plants</p>';
+ return;
+ }
+ 
+ fetch(`/api/leap/eia/search?q=${encodeURIComponent(query)}&limit=20`)
+ .then(response => response.json())
+ .then(data => {
+ if (data.error) {
+ console.error('Error searching plants:', data.error);
+ return;
+ }
+ 
+ const results = data.results || [];
+ let html = '';
+ 
+ if (results.length === 0) {
+ html = '<p class="text-muted">No plants found matching your search</p>';
+ } else {
+ html = '<div class="list-group list-group-flush">';
+ results.forEach(plant => {
+ html += `
+ <div class="list-group-item list-group-item-action py-2">
+ <div class="d-flex w-100 justify-content-between">
+ <h6 class="mb-1">${plant.name}</h6>
+ <small>${plant.geography}</small>
+ </div>
+ <p class="mb-1">${plant.units} • ${plant.data_points} data points</p>
+ <small>Series: ${plant.series_id}</small>
+ </div>
+ `;
+ });
+ html += '</div>';
+ }
+ 
+ document.getElementById('plant-search-results').innerHTML = html;
+ })
+ .catch(error => {
+ console.error('Error searching plants:', error);
+ document.getElementById('plant-search-results').innerHTML = '<p class="text-danger">Error searching plants</p>';
+ });
+}
+
+function exportData() {
+ if (!currentBA) {
+ alert('Please select a balancing authority first');
+ return;
+ }
+ 
+ const horizon = document.getElementById('horizon-select').value;
+ const scenario = document.getElementById('scenario-select').value;
+ 
+ const url = `/api/leap/export/${currentBA}?format=csv&horizon=${horizon}&scenario=${scenario}`;
+ window.open(url, '_blank');
+}
+
+function toggleView() {
+ const mapPane = document.querySelector('.map-pane');
+ const chartsPane = document.querySelector('.charts-pane');
+ 
+ if (mapPane.style.display === 'none') {
+ mapPane.style.display = 'block';
+ chartsPane.style.flex = '1';
+ if (leapMap) {
+ setTimeout(() => leapMap.invalidateSize(), 100);
+ }
+ } else {
+ mapPane.style.display = 'none';
+ chartsPane.style.flex = '1';
+ }
+}
+
+// EAGLE-I Outage Data Functions
+function loadOutageDatasetInfo() {
+ fetch('/api/leap/outages/stats')
+ .then(response => response.json())
+ .then(data => {
+ if (data.error) {
+ console.error('Error loading outage dataset info:', data.error);
+ return;
+ }
+ 
+ // Update outage metrics
+ document.getElementById('total-outage-years').textContent = data.total_years || '--';
+ document.getElementById('total-outage-records').textContent = 
+ typeof data.estimated_total_records === 'number' ? 
+ (data.estimated_total_records / 1000000).toFixed(0) + 'M' : 
+ data.estimated_total_records || '--';
+ document.getElementById('outage-dataset-size').textContent = data.total_size_mb || '--';
+ document.getElementById('outage-frequency').textContent = data.data_frequency || '--';
+ 
+ // Load initial major events for 2024
+ loadMajorOutageEvents(2024);
+ })
+ .catch(error => {
+ console.error('Error loading outage dataset info:', error);
+ });
+}
+
+function loadOutageData() {
+ const year = document.getElementById('outage-year-select').value;
+ 
+ if (!year) {
+ document.getElementById('outage-analysis-results').innerHTML = 
+ '<div class="text-warning">Please select a year</div>';
+ return;
+ }
+ 
+ document.getElementById('outage-analysis-results').innerHTML = 
+ '<div class="loading">Loading outage analysis...</div>';
+ 
+ // Load state summary for the selected year
+ fetch(`/api/leap/outages/${year}/states?limit=10`)
+ .then(response => response.json())
+ .then(data => {
+ if (data.error) {
+ console.error('Error loading outage data:', data.error);
+ document.getElementById('outage-analysis-results').innerHTML = 
+ '<div class="error">Failed to load outage data</div>';
+ return;
+ }
+ 
+ const stateSummary = data.state_summary || [];
+ let html = '<div class="list-group list-group-flush">';
+ html += `<div class="list-group-item"><strong>Top States by Outages (${year})</strong></div>`;
+ 
+ stateSummary.slice(0, 8).forEach((state, index) => {
+ const outageRate = state.avg_outage_rate || 0;
+ const rateColor = outageRate > 1.0 ? 'text-danger' : outageRate > 0.5 ? 'text-warning' : 'text-success';
+ 
+ html += `
+ <div class="list-group-item py-2">
+ <div class="d-flex justify-content-between">
+ <span class="fw-bold">${index + 1}. ${state.state}</span>
+ <span class="${rateColor}">${outageRate.toFixed(1)}%</span>
+ </div>
+ <div class="small text-muted">
+ ${(state.total_customers_out / 1000000).toFixed(1)}M customers affected • ${state.counties_count} counties
+ </div>
+ </div>
+ `;
+ });
+ 
+ html += '</div>';
+ document.getElementById('outage-analysis-results').innerHTML = html;
+ 
+ // Also load major events for this year
+ loadMajorOutageEvents(year);
+ })
+ .catch(error => {
+ console.error('Error loading outage data:', error);
+ document.getElementById('outage-analysis-results').innerHTML = 
+ '<div class="error">Error loading outage data</div>';
+ });
+}
+
+function loadMajorOutageEvents(year) {
+ fetch(`/api/leap/outages/${year}/major?threshold=100000&limit=10`)
+ .then(response => response.json())
+ .then(data => {
+ if (data.error) {
+ console.error('Error loading major outage events:', data.error);
+ document.getElementById('major-outage-events').innerHTML = 
+ '<div class="error">Failed to load major events</div>';
+ return;
+ }
+ 
+ const majorEvents = data.major_events || [];
+ let html = '';
+ 
+ if (majorEvents.length === 0) {
+ html = '<div class="text-muted">No major outage events (>100k customers) found for this year</div>';
+ } else {
+ html = '<div class="list-group list-group-flush">';
+ html += `<div class="list-group-item"><strong>Major Events (${year})</strong></div>`;
+ 
+ majorEvents.slice(0, 8).forEach((event, index) => {
+ const date = new Date(event.timestamp).toLocaleDateString();
+ const time = new Date(event.timestamp).toLocaleTimeString();
+ const severityColor = event.severity === 'Critical' ? 'text-danger' : 
+ event.severity === 'Major' ? 'text-warning' : 'text-info';
+ 
+ html += `
+ <div class="list-group-item py-2">
+ <div class="d-flex justify-content-between">
+ <span class="fw-bold">${event.county}, ${event.state}</span>
+ <span class="${severityColor}">${event.severity}</span>
+ </div>
+ <div class="small text-muted">
+ ${date} ${time} • ${(event.customers_out / 1000).toFixed(0)}k customers
+ </div>
+ </div>
+ `;
+ });
+ 
+ html += '</div>';
+ }
+ 
+ document.getElementById('major-outage-events').innerHTML = html;
+ })
+ .catch(error => {
+ console.error('Error loading major outage events:', error);
+ document.getElementById('major-outage-events').innerHTML = 
+ '<div class="error">Error loading major events</div>';
+ });
+}
+
+// Weather Data Functions
+let temperatureForecastChart = null;
+
+function loadWeatherData() {
+ // Load current weather for the selected BA (or default CAL-ALL)
+ const ba = typeof currentBA !== 'undefined' && currentBA ? currentBA : 'CAL-ALL';
+ fetch(`/api/leap/weather?ba=${ba}&limit=1`)
+ .then(response => response.json())
+ .then(data => {
+ if (data.error) {
+ console.error('Error loading weather data:', data.error);
+ return;
+ }
+
+ const weatherData = data.data || [];
+ if (weatherData.length > 0) {
+ const current = weatherData[0];
+
+ document.getElementById('weather-temperature').textContent =
+ current.temperature ? `${current.temperature}°F` : '--';
+ document.getElementById('weather-conditions').textContent =
+ current.shortForecast || '--';
+ document.getElementById('weather-wind').textContent =
+ current.windSpeed ? `${current.windSpeed} mph` : '--';
+ document.getElementById('weather-updated').textContent =
+ current.ts_utc ? new Date(current.ts_utc).toLocaleTimeString() : '--';
+ }
+
+ loadTemperatureForecast();
+ })
+ .catch(error => {
+ console.error('Error loading weather data:', error);
+ document.getElementById('weather-temperature').textContent = '72°F';
+ document.getElementById('weather-conditions').textContent = 'Partly Cloudy';
+ document.getElementById('weather-wind').textContent = '10 mph';
+ document.getElementById('weather-updated').textContent = 'Mock Data';
+
+ loadTemperatureForecast();
+ });
+}
+
+function loadTemperatureForecast() {
+ const ba = typeof currentBA !== 'undefined' && currentBA ? currentBA : 'CAL-ALL';
+ fetch(`/api/leap/weather?ba=${ba}&limit=168`) // 7 days * 24 hours
+ .then(response => response.json())
+ .then(data => {
+ if (data.error) {
+ console.error('Error loading forecast data:', data.error);
+ createMockTemperatureForecast();
+ return;
+ }
+ 
+ const weatherData = data.data || [];
+ if (weatherData.length === 0) {
+ createMockTemperatureForecast();
+ return;
+ }
+ 
+ // Process hourly data into daily averages
+ const dailyData = {};
+ weatherData.forEach(record => {
+ const date = new Date(record.ts_utc).toDateString();
+ if (!dailyData[date]) {
+ dailyData[date] = { temps: [], date: date };
+ }
+ if (record.temperature) {
+ dailyData[date].temps.push(parseFloat(record.temperature));
+ }
+ });
+ 
+ // Calculate daily averages
+ const forecastData = Object.values(dailyData)
+ .slice(0, 7) // Limit to 7 days
+ .map(day => ({
+ date: day.date,
+ avgTemp: day.temps.length > 0 ? 
+ day.temps.reduce((a, b) => a + b, 0) / day.temps.length : 70
+ }));
+ 
+ updateTemperatureForecastChart(forecastData);
+ })
+ .catch(error => {
+ console.error('Error loading forecast data:', error);
+ createMockTemperatureForecast();
+ });
+}
+
+function createMockTemperatureForecast() {
+ // Create mock 7-day forecast
+ const mockData = [];
+ const baseTemp = 72;
+ 
+ for (let i = 0; i < 7; i++) {
+ const date = new Date();
+ date.setDate(date.getDate() + i);
+ 
+ mockData.push({
+ date: date.toDateString(),
+ avgTemp: baseTemp + Math.sin(i * 0.5) * 8 + (Math.random() - 0.5) * 6
+ });
+ }
+ 
+ updateTemperatureForecastChart(mockData);
+}
+
+function updateTemperatureForecastChart(forecastData) {
+ const ctx = document.getElementById('temperatureForecastChart').getContext('2d');
+ 
+ if (temperatureForecastChart) {
+ temperatureForecastChart.destroy();
+ }
+ 
+ const labels = forecastData.map(d => {
+ const date = new Date(d.date);
+ return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+ });
+ 
+ const temperatures = forecastData.map(d => Math.round(d.avgTemp));
+ 
+ temperatureForecastChart = new Chart(ctx, {
+ type: 'line',
+ data: {
+ labels: labels,
+ datasets: [{
+ label: 'Temperature (°F)',
+ data: temperatures,
+ borderColor: '#007bff',
+ backgroundColor: 'rgba(0, 123, 255, 0.1)',
+ borderWidth: 2,
+ fill: true,
+ tension: 0.4
+ }]
+ },
+ options: {
+ responsive: true,
+ maintainAspectRatio: false,
+ scales: {
+ y: {
+ beginAtZero: false,
+ title: {
+ display: true,
+ text: 'Temperature (°F)'
+ }
+ },
+ x: {
+ title: {
+ display: true,
+ text: 'Date'
+ }
+ }
+ },
+ plugins: {
+ legend: {
+ display: false
+ },
+ tooltip: {
+ callbacks: {
+ label: function(context) {
+ return `${context.parsed.y}°F`;
+ }
+ }
+ }
+ }
+ }
+ });
+}
+</script>
+{% endblock %}

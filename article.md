@@ -1,83 +1,75 @@
 ---
-canonical_link: "https://medium.com/p/887ac9422b7b"
+canonical_link: "https://medium.com/@kyle-t-jones/01-load-forecasting-blog-887ac9422b7b"
 date_exported_from_medium: "November 10, 2025"
+companion_app: "LEAP (Load Estimation and Planning) — see README.md"
 ---
 
-# 01_load_forecasting_blog Power markets operate on razor-thin margins where a single
-miscalculation can cost millions. When Texas faced its historic winter storm in...
+# Why Electric Load Forecasting Still Runs the Grid (and How One System Puts Theory to Work)
 
-### 01_load_forecasting_blog 
+Power grids do not store electricity at scale the way a warehouse stores boxes. Supply and demand must stay in close balance every second. Operators plan hours and days ahead so generators, imports, and demand response can meet the shape of tomorrow's load. That planning rests on load forecasts: estimates of how many megawatts customers will draw at each hour.
 
-Power markets operate on razor-thin margins where a single miscalculation can cost millions. When Texas faced its historic winter storm in February 2021, load forecasting errors contributed to widespread blackouts and electricity prices that spiked to \$9,000 per megawatt-hour-nearly 180 times the normal rate. The traders who had accurate load forecasts made fortunes; those who didn't faced catastrophic losses.
+This article explains what load forecasting is, why it is hard, and how teams build systems that stay useful in production. The companion code in this repository is **LEAP** (Load Estimation and Planning): a local Flask application with hourly load series, weather-aware features, ERCOT 4CP scoring, and multi-model forecasting hooks. The point is the loop: data, models, metrics, and human review.
 
-Load forecasting isn't just about predicting how much electricity consumers will use tomorrow-it's about understanding the intricate dance between weather patterns, economic activity, and human behavior, then translating that understanding into actionable trading decisions.
+## The job in plain terms
 
-### Why Load Forecasting Determines Market Success
-###  
-Every megawatt of electricity must be generated at the exact moment it's consumed. This fundamental constraint makes power trading uniquely challenging compared to other commodities. You can't stockpile electricity like you can crude oil. When a utility underestimates load, it must purchase expensive power on the spot market. When it overestimates, it wastes money generating unnecessary electricity.
+A load forecast answers a simple question: how much power will we need, and when?
 
-Professional power traders use load forecasting to: --- Position themselves ahead of demand spikes --- Optimize generation schedules across multiple plants --- Price forward contracts with appropriate risk premiums --- Identify arbitrage opportunities between day-ahead and real-time markets
+The answer feeds unit commitment, market bids, reserve margins, and maintenance windows. A forecast that is too high ties up fuel and capacity. A forecast that is too low risks tight reserves or emergency measures. Small errors at off-peak hours matter less than errors at the peak hour of a hot summer day.
 
-The difference between a good forecast and a great forecast often represents the difference between profit and loss.
+## What actually moves the needle
 
-### Understanding the Load Curve
-###  
-Let's examine how load patterns evolve throughout a typical day using real market data:
+Electric load repeats with the clock and the calendar. Weather is the largest external driver for short horizons. The grid itself is changing: rooftop solar, storage, and flexible loads all shift the shape operators must predict.
 
-This code generates a load curve that mirrors real-world behavior. Notice how load factor-the ratio of actual load to peak capacity-varies dramatically throughout the day. During the night valley period (hours 22--5), load factor drops to around 60%, while during evening peak (hours 17--21), it climbs above 95%.
+## Models in LEAP
 
-### The Price-Load Relationship
-###  
-Understanding how prices respond to load changes is crucial for trading profitably:
+LEAP compares classical and machine-learning families on held-out hours per balancing authority:
 
-The price elasticity metric reveals how aggressively prices respond to load changes. In tight market conditions, even a small load increase can cause dramatic price spikes. Professional traders monitor this relationship constantly, positioning themselves to profit from predictable price movements.
+1. **ARIMA** — fast seasonal baseline (`app/services/models/arima_model.py`)
+2. **LightGBM** — gradient boosting on lags, calendar features, and weather
+3. **LSTM** — optional PyTorch sequence model (`pip install -e ".[ml]"`)
 
-### Multi-Day Forecasting for Strategic Positioning
-###  
-While intraday forecasts guide immediate trading decisions, multi-day forecasts enable strategic positioning:
+The live API uses trend extrapolation from recent load when history is available, then falls back to a seasonal pattern by balancing authority.
 
-This week-ahead forecast reveals patterns that aren't apparent in single-day analysis. Notice how weekend load drops approximately 15% compared to weekdays-a pattern that creates predictable trading opportunities. Smart traders position themselves Friday afternoon to capture the weekend valley, then reverse their positions Sunday evening ahead of the Monday ramp.
+## Data work is most of the project
 
-### Weather Integration: The Critical Variable
-###  
-Weather drives 40--60% of load variability in most power markets. During summer heat waves, air conditioning load can spike dramatically:
+Forecasts fail in the warehouse more often than in the equation. LEAP keeps a simple local layout:
 
-On a 98°F day with 75% humidity, peak load can increase 40--50% compared to moderate weather, while prices may double or triple. These weather-driven load spikes create the most profitable trading opportunities-if you can forecast them accurately.
+- `data/cache/load_hourly.parquet` — synthetic or seeded hourly load for seven US balancing authorities
+- `data/samples/ELEC_article_sample.parquet` — normalized EIA plant series for pandas (~5 MB)
+- `data/samples/article_data_bundle.zip` — zip (~10 MB) with normalized + raw excerpt
+- `data/ELEC.parquet` — 50k-series excerpt of the full ~350 MB EIA bulk file
 
-### Advanced Forecasting with Machine Learning
-###  
-Modern load forecasting combines traditional statistical methods with machine learning:
+Regenerate ELEC samples:
 
-A well-trained machine learning model can achieve forecast errors below 2--3% for next-day predictions, which translates to significant trading advantages. The gradient boosting approach automatically captures complex interactions between variables that would be difficult to model explicitly.
+```bash
+python scripts/build_elec_article_sample.py
+```
 
-Markets move fast. Static forecasts become stale within hours. Professional traders continuously update their forecasts as new information becomes available:
+Regenerate load cache:
 
-When actual load runs above forecast, smart traders immediately update their expectations for the rest of the day. This real-time adjustment capability separates professional operations from amateur ones.
+```bash
+python scripts/seed/seed_synthetic.py
+```
 
-### Key Takeaways for Power Traders
-###  
-Load forecasting forms the foundation of successful power trading. The analysis presented here demonstrates several critical principles:
+## Short-term forecasting as a pipeline
 
-1. Pattern Recognition Drives Profit: Understanding how load varies by hour, day type, and season allows traders to position themselves ahead of predictable movements.
+Industry ST-ELF-style pipelines ingest history, build features, score models, monitor drift, and visualize results. LEAP implements that shape for a laptop demo: ingestion scripts under `scripts/`, feature construction in `app/services/local_data.py`, forecasting in `app/services/forecast_service.py`, and charts on the dashboard.
 
-2. Weather Is the Dominant Variable: Temperature and humidity drive 40--60% of load variability. Accurate weather forecasts translate directly to profitable trading positions.
+## Run the companion app
 
-3. Price Response Is Non-Linear: Prices don't move linearly with load. During tight supply conditions, small load increases cause exponential price spikes.
+```bash
+pip install -r requirements.txt
+python run.py
+```
 
-4. Real-Time Adaptation Matters: Markets move continuously. Static forecasts become stale quickly. Successful traders update their views as new information arrives.
+Open `http://localhost:3000`. Example APIs:
 
-5. Accuracy Equals Money: A 1% improvement in forecast accuracy can translate to millions of dollars in improved trading performance for large portfolios.
+- `GET /api/leap/areas`
+- `GET /api/leap/load/TEX-ALL?limit=168`
+- `GET /api/leap/forecast/TEX-ALL?horizon=24`
 
-The code examples provided offer implementations you can deploy immediately. Start with the base load curve generation, add weather adjustments, incorporate machine learning, and implement real-time updates. Each enhancement increases your competitive edge.
+Full API reference and dataset notes are in [README.md](README.md). The long-form essay is in [docs/MEDIUM_ARTICLE.md](docs/MEDIUM_ARTICLE.md).
 
-### Implementation Strategy
-###  
-To implement these forecasting techniques in your own trading operation:
+---
 
-1.  [Establish Baseline: Start with simple pattern-based forecasts using historical load data]
-2.  [Add Weather Integration: Incorporate temperature and humidity forecasts from reliable meteorological services]
-3.  [Deploy Machine Learning: Train gradient boosting models on your historical data]
-4.  [Enable Real-Time Updates: Build infrastructure to continuously update forecasts as actual data arrives]
-5.  [Validate and Refine: Compare forecast accuracy against actual outcomes and continuously improve your models]
-
-The traders who master load forecasting gain a decisive advantage in power markets. While others react to price movements, you'll anticipate them-positioning your portfolio to profit from predictable patterns that repeat day after day, season after season. *Originally published at* [*https://kylejones200.github.io*](https://kylejones200.github.io/medium/01_load_forecasting_blog.html)*.*
+*Educational/demo code only. Not financial, safety, or engineering advice.*

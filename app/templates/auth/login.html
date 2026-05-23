@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+
+{% block content %}
+ <div class="auth-container">
+ <div class="auth-card">
+ <h2>Login</h2>
+ 
+ {% if auth_config.authenticated %}
+ <div class="auth-status">
+ <p>You are already logged in.</p>
+ <a href="{{ url_for('main.index') }}" class="btn btn-primary">Go to Dashboard</a>
+ </div>
+ {% else %}
+ <div class="auth-options">
+ {% if auth_config.oidc_enabled %}
+ <a href="{{ url_for('auth.login_oidc') }}" class="btn btn-primary btn-large">
+ Login with OIDC
+ </a>
+ {% endif %}
+ 
+ {% if auth_config.sso_enabled %}
+ <a href="#" class="btn btn-secondary btn-large">
+ Login with {{ auth_config.sso_provider }}
+ </a>
+ {% endif %}
+ 
+ {% if not auth_config.oidc_enabled and not auth_config.sso_enabled %}
+ <div class="auth-info">
+ <p>Authentication is not configured.</p>
+ <p>Set up OIDC or SSO in your environment variables.</p>
+ </div>
+ {% endif %}
+ </div>
+ {% endif %}
+ </div>
+ </div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+.auth-container {
+ display: flex;
+ justify-content: center;
+ align-items: center;
+ min-height: 60vh;
+ padding: 2rem;
+}
+
+.auth-card {
+ background: var(--bg);
+ border: 1px solid var(--border);
+ border-radius: 8px;
+ padding: 2rem;
+ max-width: 400px;
+ width: 100%;
+ text-align: center;
+}
+
+.auth-card h2 {
+ margin-top: 0;
+ margin-bottom: 1.5rem;
+ color: var(--fg);
+}
+
+.auth-options {
+ display: flex;
+ flex-direction: column;
+ gap: 1rem;
+}
+
+.btn {
+ display: inline-block;
+ padding: 0.75rem 1.5rem;
+ border: none;
+ border-radius: 4px;
+ text-decoration: none;
+ font-weight: bold;
+ transition: background-color 0.2s;
+}
+
+.btn-primary {
+ background: var(--accent);
+ color: white;
+}
+
+.btn-primary:hover {
+ background: #0056b3;
+}
+
+.btn-secondary {
+ background: var(--muted);
+ color: white;
+}
+
+.btn-secondary:hover {
+ background: #555;
+}
+
+.btn-large {
+ padding: 1rem 2rem;
+ font-size: 1.1rem;
+}
+
+.auth-info {
+ color: var(--muted);
+ font-style: italic;
+}
+
+.auth-status {
+ color: var(--success);
+}
+</style>
+{% endblock %}

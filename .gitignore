@@ -1,8 +1,12 @@
+# Local data cache (regenerate with scripts/seed/seed_synthetic.py)
+data/cache/
+
 # Python
 __pycache__/
 *.pyc
 *.pyo
 .venv/
+.mypy_cache/
 venv/
 env/
 *.egg-info/

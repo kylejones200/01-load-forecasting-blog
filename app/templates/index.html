@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+
+{% block content %}
+ <div class="hero">
+ <h2>Cost Explorer</h2>
+ <p>Search statewide bid history to find vendor savings and price baselines.</p>
+ </div>
+
+ <div class="features" style="margin-bottom: 1rem;">
+ <div class="feature-card" style="grid-column: 1 / -1; text-align:left;">
+ <label for="q"><strong>Search Materials</strong></label>
+ <input id="q" type="text" placeholder="e.g. riprap, guardrail, cabinet" style="width:100%; padding:0.75rem; margin-top:0.5rem;">
+ <small>Type to search. Results appear below.</small>
+ </div>
+ </div>
+
+ <div class="features" id="results" style="grid-template-columns: 1fr 2fr; align-items:start;">
+ <div class="feature-card">
+ <h3>Results</h3>
+ <ul id="resultList" style="list-style:none; padding-left:0;">
+ <!-- Filled by JS -->
+ </ul>
+ </div>
+ <div class="feature-card">
+ <h3 id="matTitle">Material</h3>
+ <div id="matMeta" style="color:var(--muted); margin-bottom:0.5rem;"></div>
+ <div class="chart-container" style="height:320px;">
+ <canvas id="vendorChart"></canvas>
+ </div>
+ <h4>Recommendations</h4>
+ <table style="width:100%; border-collapse:collapse;">
+ <thead>
+ <tr>
+ <th style="text-align:left; border-bottom:1px solid var(--border);">Vendor</th>
+ <th style="text-align:right; border-bottom:1px solid var(--border);">Median</th>
+ <th style="text-align:right; border-bottom:1px solid var(--border);">Savings</th>
+ <th style="text-align:right; border-bottom:1px solid var(--border);">Samples</th>
+ <th style="text-align:right; border-bottom:1px solid var(--border);">Last</th>
+ </tr>
+ </thead>
+ <tbody id="recTable"></tbody>
+ </table>
+ </div>
+ </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+ const resultList = document.getElementById('resultList');
+ const q = document.getElementById('q');
+ const matTitle = document.getElementById('matTitle');
+ const matMeta = document.getElementById('matMeta');
+ const recTable = document.getElementById('recTable');
+ let chart;
+
+ async function searchMaterials(term) {
+ const resp = await fetch(`/api/materials/search?q=${encodeURIComponent(term)}&limit=25`);
+ const data = await resp.json();
+ return data.items || [];
+ }
+
+ function renderResults(items) {
+ resultList.innerHTML = '';
+ items.forEach(it => {
+ const li = document.createElement('li');
+ li.style.padding = '0.5rem 0';
+ li.style.borderBottom = '1px solid var(--border)';
+ li.innerHTML = `<a href="#" data-id="${it.id}"><strong>${it.name}</strong></a><br><small>${it.cfihos_class_name || ''} ${it.cfihos_class_code ? '('+it.cfihos_class_code+')' : ''}</small>`;
+ li.querySelector('a').addEventListener('click', (e) => {
+ e.preventDefault();
+ loadMaterial(it.id);
+ });
+ resultList.appendChild(li);
+ });
+ }
+
+ async function loadMaterial(id) {
+ const [sumResp, recResp] = await Promise.all([
+ fetch(`/api/materials/${id}/summary`),
+ fetch(`/api/materials/${id}/recommendations?qty=1&min_savings_pct=0.05`)
+ ]);
+ const sum = await sumResp.json();
+ if (sum.error) { return; }
+ const rec = await recResp.json();
+
+ matTitle.textContent = sum.material.name;
+ matMeta.textContent = `Baseline: $${sum.baseline} • Class: ${sum.material.cfihos_class_name || '—'} ${sum.material.cfihos_class_code ? '('+sum.material.cfihos_class_code+')' : ''}`;
+
+ // Vendor medians chart
+ const labels = sum.vendors.map(v => v.vendor_id);
+ const data = sum.vendors.map(v => v.median_unit_cost || 0);
+ const ctx = document.getElementById('vendorChart').getContext('2d');
+ if (chart) chart.destroy();
+ chart = new Chart(ctx, {
+ type: 'bar',
+ data: {
+ labels,
+ datasets: [{
+ label: 'Vendor median unit cost',
+ data,
+ backgroundColor: 'rgba(0,0,0,0.1)',
+ borderColor: '#000',
+ borderWidth: 1
+ }]
+ },
+ options: {
+ responsive: true,
+ maintainAspectRatio: false,
+ scales: {
+ y: { beginAtZero: true }
+ }
+ }
+ });
+
+ // Recommendations table
+ recTable.innerHTML = '';
+ (rec.recommendations || []).forEach(r => {
+ const tr = document.createElement('tr');
+ tr.innerHTML = `
+ <td style="padding:0.25rem 0;">${r.vendor_name || r.vendor_id}</td>
+ <td style="text-align:right;">$${r.unit_cost}</td>
+ <td style="text-align:right;">${(r.savings_pct*100).toFixed(1)}%</td>
+ <td style="text-align:right;">${r.evidence.samples}</td>
+ <td style="text-align:right;">${r.evidence.last_date || ''}</td>
+ `;
+ recTable.appendChild(tr);
+ });
+ }
+
+ let debounce;
+ q.addEventListener('input', () => {
+ clearTimeout(debounce);
+ debounce = setTimeout(async () => {
+ const items = await searchMaterials(q.value);
+ renderResults(items);
+ }, 200);
+ });
+
+ // initial
+ (async () => {
+ const items = await searchMaterials('');
+ renderResults(items);
+ if (items.length) loadMaterial(items[0].id);
+ })();
+</script>
+{% endblock %}
+
