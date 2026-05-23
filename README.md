@@ -297,7 +297,10 @@ Integrates NOAA/NWS severe weather alerts into demand impact assessment. Maps 12
 │   └── seed/seed_synthetic.py
 ├── tests/
 ├── run.py
-└── pyproject.toml
+├── pyproject.toml
+├── rust/                   # Rust port (core + PyO3 + CLI bench)
+├── benchmark_rust.py       # Python vs Rust benchmark
+├── src/compute_kernel.py   # Python/numpy reference kernel
 ```
 
 ## Configuration
@@ -308,6 +311,31 @@ Integrates NOAA/NWS severe weather alerts into demand impact assessment. Maps 12
 | `FLASK_PORT` | Local server port | `3000` |
 | `SECRET_KEY` | Flask session secret | change in production |
 | `EIA_API_KEY` | Optional EIA API key for live ingestion scripts | — |
+
+## Rust performance port
+
+Side-by-side **Python vs Rust** implementation of the numeric hot loop — SAIDI / SAIFI aggregation by group key. Reference PyO3 benchmark: **~4×** on a release build (local machine; run `benchmark_rust.py` to reproduce).
+
+| Path | Role |
+|------|------|
+| `src/compute_kernel.py` | Python/numpy reference kernel |
+| `rust/core/` | Pure Rust library |
+| `rust/py/` | PyO3 bindings |
+| `rust/bench/` | Standalone CLI benchmark |
+| `benchmark_rust.py` | Python vs Rust timing + correctness check |
+
+```bash
+# Rust-only CLI benchmark
+cd rust && cargo run --release -p load_forecasting_blog_bench
+
+# Python vs Rust (PyO3)
+pip install maturin numpy
+maturin develop --release -m rust/py/Cargo.toml
+python benchmark_rust.py
+```
+
+Python ML training, solvers, and orchestration stay in Python; Rust targets the numeric hot loops. Stochastic generators validate output shapes; deterministic kernels match at tight floating-point tolerance.
+
 
 ## Disclaimer
 
