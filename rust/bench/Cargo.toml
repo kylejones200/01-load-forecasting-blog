@@ -1,0 +1,13 @@
+[package]
+name = "load_forecasting_blog_bench"
+description = "Standalone Rust benchmark (no Python)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "bench"
+path = "src/main.rs"
+
+[dependencies]
+load_forecasting_blog_core = { path = "../core" }

@@ -44,3 +44,14 @@ line-length = 100
 select = ["E", "F", "I", "UP"]
 
 [tool.uv]
+
+[build-system]
+requires = ["maturin>=1.7,<2.0"]
+build-backend = "maturin"
+
+# Optional Rust extension — build with:
+#   pip install maturin && maturin develop --release -m rust/py/Cargo.toml
+[tool.maturin]
+manifest-path = "rust/py/Cargo.toml"
+module-name = "load_forecasting_blog_rs"
+

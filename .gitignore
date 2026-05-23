@@ -34,3 +34,4 @@ secrets.json
 service-account*.json
 *.pem
 *.key
+rust/target/

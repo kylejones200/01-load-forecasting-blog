@@ -1,0 +1,15 @@
+[package]
+name = "load_forecasting_blog_rs"
+description = "Python bindings (PyO3) for load_forecasting_blog_core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+name = "load_forecasting_blog_rs"
+crate-type = ["cdylib"]
+
+[dependencies]
+load_forecasting_blog_core = { path = "../core" }
+pyo3 = { version = "0.28", features = ["extension-module"] }
+numpy = "0.28"
